@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>團體照隨機產生器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d222b;
+      --muted: #647084;
+      --line: #d7dde7;
+      --panel: #f7f9fc;
+      --panel-strong: #eef2f7;
+      --accent: #0d7f73;
+      --accent-ink: #ffffff;
+      --warn: #9a4d14;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: #e9edf3;
+      color: var(--ink);
+      font-family: "Segoe UI", "Noto Sans TC", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(14px);
+    }
+
+    .title {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .button,
+    .file-button,
+    .select {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+      color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .button:hover,
+    .file-button:hover,
+    .select:hover {
+      border-color: #a9b4c5;
+      background: #fbfcfe;
+    }
+
+    .button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 650;
+    }
+
+    .button.primary:hover {
+      background: #0b7066;
+    }
+
+    .button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .select {
+      padding-right: 8px;
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      min-height: 0;
+    }
+
+    .stage-wrap {
+      min-width: 0;
+      min-height: 0;
+      padding: 18px;
+      display: grid;
+      place-items: center;
+    }
+
+    .canvas-shell {
+      width: min(100%, 1280px);
+      aspect-ratio: 16 / 10;
+      border: 1px solid #c6ceda;
+      border-radius: var(--radius);
+      background: #ffffff;
+      box-shadow: 0 18px 38px rgba(31, 44, 71, 0.14);
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .side {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .side-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #3d4858;
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr 42px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .value {
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .thumbs {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      align-content: start;
+    }
+
+    .thumb {
+      height: 112px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(45deg, #dce2eb 25%, transparent 25%),
+        linear-gradient(-45deg, #dce2eb 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #dce2eb 75%),
+        linear-gradient(-45deg, transparent 75%, #dce2eb 75%),
+        #f7f9fc;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+      background-size: 20px 20px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      overflow: hidden;
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 84px;
+      object-fit: contain;
+      padding: 6px;
+    }
+
+    .thumb span {
+      min-width: 0;
+      padding: 0 8px 7px;
+      color: #4b5667;
+      font-size: 12px;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      border: 1px dashed #aeb8c8;
+      border-radius: var(--radius);
+      padding: 16px;
+      color: var(--muted);
+      background: #ffffff;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .notice {
+      min-height: 20px;
+      color: var(--warn);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .actions {
+        justify-content: flex-start;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 300px;
+      }
+
+      .side {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .thumbs {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .stage-wrap {
+        padding: 10px;
+      }
+
+      .canvas-shell {
+        width: 100%;
+      }
+
+      .button,
+      .file-button,
+      .select {
+        height: 34px;
+        padding: 0 10px;
+        font-size: 14px;
+      }
+
+      h1 {
+        font-size: 16px;
+      }
+
+      .thumbs {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="title">
+        <h1>團體照</h1>
+        <div class="status" id="status">載入 PNG 中</div>
+      </div>
+      <div class="actions">
+        <select class="select" id="backgroundSelect" aria-label="背景">
+          <option value="studio">攝影棚</option>
+          <option value="paper">白底</option>
+          <option value="street">街景色塊</option>
+          <option value="dark">深色棚拍</option>
+        </select>
+        <button class="button primary" id="randomButton" type="button" title="重新隨機">
+          <span class="icon" aria-hidden="true">↻</span>
+          重新隨機
+        </button>
+        <button class="button" id="downloadButton" type="button" title="下載 PNG">
+          <span class="icon" aria-hidden="true">⇩</span>
+          下載 PNG
+        </button>
+        <label class="file-button" for="fileInput" title="加入 PNG">
+          <span class="icon" aria-hidden="true">＋</span>
+          加入 PNG
+        </label>
+        <input id="fileInput" type="file" accept="image/png,image/webp,image/jpeg" multiple>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <div class="stage-wrap">
+        <div class="canvas-shell">
+          <canvas id="stage" width="1600" height="1000" aria-label="隨機產生的團體照"></canvas>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="side-head">
+          <div class="field">
+            <label for="countRange">人數</label>
+            <div class="range-row">
+              <input id="countRange" type="range" min="2" max="10" value="6" step="1">
+              <div class="value" id="countValue">6</div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="spacingRange">間距</label>
+            <div class="range-row">
+              <input id="spacingRange" type="range" min="0" max="180" value="70" step="5">
+              <div class="value" id="spacingValue">70</div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="scaleRange">人物大小</label>
+            <div class="range-row">
+              <input id="scaleRange" type="range" min="-12" max="16" value="0" step="1">
+              <div class="value" id="scaleValue">0</div>
+            </div>
+          </div>
+          <div class="notice" id="notice"></div>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const defaultFiles = [
+      "01.png",
+      "02.png",
+      "03.png",
+      "04.png",
+      "05.png",
+      "06.png",
+      "07.png",
+      "08.png",
+      "09.png",
+      "10.png",
+      "11.png",
+      "12.png",
+      "13.png",
+      "14.png",
+      "15.png",
+      "16.png",
+      "17.png",
+      "18.png",
+      "19.png",
+      "20.png",
+      "21.png",
+      "22.png",
+      "23.png",
+      "24.png",
+      "25.png",
+      "26.png",
+      "27.png",
+      "28.png",
+      "29.png",
+      "30.png",
+      "31.png",
+      "32.png",
+      "33.png",
+      "34.png",
+      "35.png",
+      "36.png",
+      "37.png",
+      "38.png",
+      "39.png",
+      "40.png",
+      "41.png",
+      "42.png",
+      "43.png",
+      "44.png",
+      "45.png",
+      "46.png",
+      "47.png"
+    ];
+
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const noticeEl = document.getElementById("notice");
+    const thumbsEl = document.getElementById("thumbs");
+    const randomButton = document.getElementById("randomButton");
+    const downloadButton = document.getElementById("downloadButton");
+    const fileInput = document.getElementById("fileInput");
+    const backgroundSelect = document.getElementById("backgroundSelect");
+    const countRange = document.getElementById("countRange");
+    const countValue = document.getElementById("countValue");
+    const spacingRange = document.getElementById("spacingRange");
+    const spacingValue = document.getElementById("spacingValue");
+    const scaleRange = document.getElementById("scaleRange");
+    const scaleValue = document.getElementById("scaleValue");
+
+    const W = canvas.width;
+    const H = canvas.height;
+    let assets = [];
+    let current = [];
+    let currentLayout = [];
+    let randomSeed = Date.now();
+
+    function personCount() {
+      return Number(countRange.value);
+    }
+
+    function setNotice(text) {
+      noticeEl.textContent = text || "";
+    }
+
+    function setStatus() {
+      statusEl.textContent = `${assets.length} 張素材，抽 ${personCount()} 人`;
+    }
+
+    function seededRandom() {
+      randomSeed = (randomSeed * 1664525 + 1013904223) >>> 0;
+      return randomSeed / 4294967296;
+    }
+
+    function shuffle(list) {
+      const copy = list.slice();
+      for (let i = copy.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(seededRandom() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function loadImage(src, name) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ img, src, name });
+        img.onerror = () => reject(new Error(name));
+        img.src = src;
+      });
+    }
+
+    async function loadDefaults() {
+      const results = await Promise.allSettled(defaultFiles.map(file => loadImage(file, file)));
+      const loaded = results
+        .filter(result => result.status === "fulfilled")
+        .map(result => prepareAsset(result.value));
+
+      assets = loaded;
+      const missing = results
+        .map((result, index) => result.status === "rejected" ? defaultFiles[index] : null)
+        .filter(Boolean);
+
+      if (missing.length) {
+        setNotice(`找不到：${missing.join("、")}`);
+      }
+      setStatus();
+      renderThumbs();
+      randomize();
+    }
+
+    function prepareAsset(item) {
+      const trim = trimTransparent(item.img);
+      return {
+        name: item.name,
+        src: item.src,
+        img: item.img,
+        trim
+      };
+    }
+
+    function trimTransparent(img) {
+      const temp = document.createElement("canvas");
+      const tctx = temp.getContext("2d", { willReadFrequently: true });
+      temp.width = img.naturalWidth || img.width;
+      temp.height = img.naturalHeight || img.height;
+      tctx.drawImage(img, 0, 0);
+
+      let minX = temp.width;
+      let minY = temp.height;
+      let maxX = -1;
+      let maxY = -1;
+
+      try {
+        const data = tctx.getImageData(0, 0, temp.width, temp.height).data;
+        for (let y = 0; y < temp.height; y += 1) {
+          for (let x = 0; x < temp.width; x += 1) {
+            const alpha = data[(y * temp.width + x) * 4 + 3];
+            if (alpha > 12) {
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+      } catch (error) {
+        minX = 0;
+        minY = 0;
+        maxX = temp.width - 1;
+        maxY = temp.height - 1;
+      }
+
+      if (maxX < minX || maxY < minY) {
+        minX = 0;
+        minY = 0;
+        maxX = temp.width - 1;
+        maxY = temp.height - 1;
+      }
+
+      const padding = 8;
+      minX = Math.max(0, minX - padding);
+      minY = Math.max(0, minY - padding);
+      maxX = Math.min(temp.width - 1, maxX + padding);
+      maxY = Math.min(temp.height - 1, maxY + padding);
+
+      const w = maxX - minX + 1;
+      const h = maxY - minY + 1;
+      const out = document.createElement("canvas");
+      out.width = w;
+      out.height = h;
+      out.getContext("2d").drawImage(temp, minX, minY, w, h, 0, 0, w, h);
+      return out;
+    }
+
+    function randomize() {
+      randomSeed = Date.now() + Math.floor(Math.random() * 100000);
+      const count = personCount();
+      if (assets.length < count) {
+        current = assets.slice();
+        currentLayout = [];
+        draw();
+        setNotice(`至少需要 ${count} 張 PNG，目前只有 ${assets.length} 張。`);
+        return;
+      }
+
+      current = shuffle(assets).slice(0, count);
+      currentLayout = createLayout();
+      setStatus();
+      setNotice("");
+      renderThumbs();
+      draw();
+    }
+
+    function createLayout() {
+      const spacing = Number(spacingRange.value);
+      const spread = spacing / 100;
+      const sizeBoost = Number(scaleRange.value) / 100;
+      const count = current.length || personCount();
+      const frontCount = count <= 3 ? count : Math.min(4, Math.max(2, Math.ceil(count * 0.4)));
+      const backCount = count - frontCount;
+      const templates = [];
+
+      function addRow(total, row, bottom, height, maxWidth, minX, maxX) {
+        if (total <= 0) return;
+        const span = maxX - minX;
+        for (let i = 0; i < total; i += 1) {
+          const t = total === 1 ? 0.5 : i / (total - 1);
+          const arc = Math.sin(t * Math.PI);
+          templates.push({
+            x: minX + span * t,
+            bottom: bottom + arc * 0.02,
+            height: height + arc * 0.03,
+            maxWidth,
+            row
+          });
+        }
+      }
+
+      if (count <= 3) {
+        addRow(count, 1, 0.92, 0.60, 0.25, 0.24, 0.76);
+      } else {
+        addRow(backCount, 0, 0.68, count > 8 ? 0.34 : 0.38, count > 8 ? 0.13 : 0.16, 0.08, 0.92);
+        addRow(frontCount, 1, 0.95, count > 8 ? 0.46 : 0.52, count > 8 ? 0.17 : 0.21, 0.18, 0.82);
+      }
+
+      return templates.map((slot, index) => {
+        const asset = current[index];
+        const aspect = asset ? asset.trim.width / asset.trim.height : 0.55;
+        const jitterX = (seededRandom() - 0.5) * (slot.row ? 18 : 12);
+        const jitterY = (seededRandom() - 0.5) * (slot.row ? 10 : 8);
+        const rotate = (seededRandom() - 0.5) * (slot.row ? 0.03 : 0.04);
+        const flip = seededRandom() > 0.78 ? -1 : 1;
+        const desiredHeight = H * Math.max(0.28, slot.height + sizeBoost);
+        const maxWidth = W * (slot.maxWidth + spread * 0.025);
+        const targetHeight = Math.min(desiredHeight, maxWidth / Math.max(aspect, 0.2));
+        const spreadX = 0.5 + (slot.x - 0.5) * (1 + spread * 0.18);
+        return {
+          x: W * spreadX + jitterX,
+          bottom: H * slot.bottom + jitterY,
+          targetHeight: targetHeight * (0.98 + seededRandom() * 0.04),
+          rotate,
+          flip,
+          row: slot.row
+        };
+      });
+    }
+
+    function drawBackground() {
+      const mode = backgroundSelect.value;
+      ctx.clearRect(0, 0, W, H);
+
+      if (mode === "dark") {
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        grad.addColorStop(0, "#202836");
+        grad.addColorStop(0.58, "#354053");
+        grad.addColorStop(1, "#151923");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.fillRect(0, H * 0.72, W, H * 0.28);
+        return;
+      }
+
+      if (mode === "street") {
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, "#dbe9f7");
+        sky.addColorStop(0.64, "#f5efe3");
+        sky.addColorStop(1, "#cfd4c9");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#ccd6d4";
+        ctx.fillRect(0, H * 0.63, W, H * 0.1);
+        ctx.fillStyle = "#b8c5c1";
+        ctx.fillRect(0, H * 0.73, W, H * 0.27);
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
+        for (let x = 80; x < W; x += 220) {
+          ctx.fillRect(x, 120, 92, 150);
+        }
+        return;
+      }
+
+      if (mode === "paper") {
+        ctx.fillStyle = "#f7f7f4";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#ecece7";
+        ctx.fillRect(0, H * 0.76, W, H * 0.24);
+        return;
+      }
+
+      const backdrop = ctx.createRadialGradient(W * 0.5, H * 0.3, 120, W * 0.5, H * 0.45, W * 0.75);
+      backdrop.addColorStop(0, "#fbfaf5");
+      backdrop.addColorStop(0.56, "#dce6e4");
+      backdrop.addColorStop(1, "#b9c7cc");
+      ctx.fillStyle = backdrop;
+      ctx.fillRect(0, 0, W, H);
+      const floor = ctx.createLinearGradient(0, H * 0.68, 0, H);
+      floor.addColorStop(0, "rgba(232,236,237,0.18)");
+      floor.addColorStop(1, "#c2c9c8");
+      ctx.fillStyle = floor;
+      ctx.fillRect(0, H * 0.68, W, H * 0.32);
+      ctx.fillStyle = "rgba(255,255,255,0.26)";
+      ctx.beginPath();
+      ctx.ellipse(W * 0.5, H * 0.36, W * 0.34, H * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawShadow(x, bottom, width, row) {
+      const alpha = backgroundSelect.value === "dark" ? 0.34 : 0.22;
+      const offset = row === 0 ? 18 : 0;
+      const grad = ctx.createRadialGradient(x, bottom + 18 + offset, 8, x, bottom + 20 + offset, width * 0.52);
+      grad.addColorStop(0, `rgba(0,0,0,${alpha})`);
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(x, bottom + 24 + offset, width * 0.58, Math.max(26, width * 0.13), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawPerson(asset, layout) {
+      const img = asset.trim;
+      const scale = layout.targetHeight / img.height;
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      const x = Math.max(18 + dw * 0.5, Math.min(W - 18 - dw * 0.5, layout.x));
+      const y = layout.bottom - dh;
+
+      drawShadow(x, layout.bottom, dw, layout.row);
+
+      ctx.save();
+      ctx.translate(x, y + dh * 0.5);
+      ctx.rotate(layout.rotate);
+      ctx.scale(layout.flip, 1);
+      ctx.drawImage(img, -dw * 0.5, -dh * 0.5, dw, dh);
+      ctx.restore();
+    }
+
+    function draw() {
+      drawBackground();
+
+      const count = personCount();
+      if (current.length < count) {
+        ctx.fillStyle = "#4b5667";
+        ctx.font = "700 34px Segoe UI, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("素材不足", W / 2, H / 2 - 10);
+        ctx.font = "22px Segoe UI, sans-serif";
+        ctx.fillText(`需要 ${count} 張 PNG`, W / 2, H / 2 + 32);
+        return;
+      }
+
+      current.forEach((asset, index) => {
+        drawPerson(asset, currentLayout[index]);
+      });
+    }
+
+    function renderThumbs() {
+      thumbsEl.textContent = "";
+      if (!current.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "尚未選取素材";
+        thumbsEl.append(empty);
+        return;
+      }
+
+      current.forEach(asset => {
+        const item = document.createElement("div");
+        item.className = "thumb";
+        const img = document.createElement("img");
+        img.src = asset.src;
+        img.alt = asset.name;
+        const label = document.createElement("span");
+        label.textContent = asset.name;
+        item.append(img, label);
+        thumbsEl.append(item);
+      });
+    }
+
+    async function addFiles(files) {
+      const incoming = Array.from(files || []);
+      if (!incoming.length) return;
+      const loaded = [];
+
+      for (const file of incoming) {
+        const url = URL.createObjectURL(file);
+        try {
+          const item = await loadImage(url, file.name);
+          loaded.push(prepareAsset(item));
+        } catch (error) {
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      assets = assets.concat(loaded);
+      setStatus();
+      randomize();
+    }
+
+    function downloadPng() {
+      try {
+        canvas.toBlob(blob => {
+          if (!blob) {
+            setNotice("下載失敗，請改用加入 PNG 載入素材後再試。");
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `group-photo-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.png`;
+          document.body.append(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        }, "image/png");
+      } catch (error) {
+        setNotice("瀏覽器阻擋本機圖片匯出，請用加入 PNG 載入素材後再下載。");
+      }
+    }
+
+    randomButton.addEventListener("click", randomize);
+    downloadButton.addEventListener("click", downloadPng);
+    fileInput.addEventListener("change", event => addFiles(event.target.files));
+    backgroundSelect.addEventListener("change", draw);
+
+    countRange.addEventListener("input", () => {
+      countValue.textContent = countRange.value;
+      setStatus();
+      randomize();
+    });
+
+    spacingRange.addEventListener("input", () => {
+      spacingValue.textContent = spacingRange.value;
+      currentLayout = createLayout();
+      draw();
+    });
+
+    scaleRange.addEventListener("input", () => {
+      scaleValue.textContent = scaleRange.value;
+      currentLayout = createLayout();
+      draw();
+    });
+
+    window.addEventListener("keydown", event => {
+      if (event.key.toLowerCase() === "r") randomize();
+    });
+
+    loadDefaults();
+  </script>
+</body>
+</html>
