@@ -168,6 +168,12 @@
       width: 100%;
       height: 100%;
       display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
     }
 
     .side {
@@ -477,6 +483,7 @@
     let assets = [];
     let current = [];
     let currentLayout = [];
+    let dragState = null;
     let randomSeed = Date.now();
 
     function personCount() {
@@ -539,7 +546,8 @@
         name: item.name,
         src: item.src,
         img: item.img,
-        trim
+        trim,
+        trimCtx: trim.getContext("2d", { willReadFrequently: true })
       };
     }
 
@@ -747,7 +755,19 @@
       const dw = img.width * scale;
       const dh = img.height * scale;
       const x = Math.max(18 + dw * 0.5, Math.min(W - 18 - dw * 0.5, layout.x));
-      const y = layout.bottom - dh;
+      const bottom = Math.max(dh + 4, Math.min(H - 4, layout.bottom));
+      const y = bottom - dh;
+      layout.x = x;
+      layout.bottom = bottom;
+      layout.bounds = {
+        x: x - dw * 0.5,
+        y,
+        w: dw,
+        h: dh,
+        cx: x,
+        cy: y + dh * 0.5,
+        scale
+      };
 
       drawShadow(x, layout.bottom, dw, layout.row);
 
@@ -758,6 +778,101 @@
       ctx.drawImage(img, -dw * 0.5, -dh * 0.5, dw, dh);
       ctx.restore();
     }
+
+    function canvasPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * (W / rect.width),
+        y: (event.clientY - rect.top) * (H / rect.height)
+      };
+    }
+
+    function hitPerson(point) {
+      for (let index = current.length - 1; index >= 0; index -= 1) {
+        const asset = current[index];
+        const layout = currentLayout[index];
+        if (!asset || !layout || !layout.bounds) continue;
+        const b = layout.bounds;
+        const dx = point.x - b.cx;
+        const dy = point.y - b.cy;
+        const cos = Math.cos(-(layout.rotate || 0));
+        const sin = Math.sin(-(layout.rotate || 0));
+        const rx = dx * cos - dy * sin;
+        const ry = dx * sin + dy * cos;
+        const localX = (layout.flip || 1) * rx + b.w * 0.5;
+        const localY = ry + b.h * 0.5;
+        if (localX < 0 || localY < 0 || localX >= b.w || localY >= b.h) continue;
+
+        const sampleX = Math.max(0, Math.min(asset.trim.width - 1, Math.floor(localX / b.scale)));
+        const sampleY = Math.max(0, Math.min(asset.trim.height - 1, Math.floor(localY / b.scale)));
+        const alpha = asset.trimCtx.getImageData(sampleX, sampleY, 1, 1).data[3];
+        if (alpha > 16) {
+          return { index, layout };
+        }
+      }
+      return null;
+    }
+
+    function movePersonToFront(index) {
+      if (index === current.length - 1) return current.length - 1;
+      const asset = current.splice(index, 1)[0];
+      const layout = currentLayout.splice(index, 1)[0];
+      current.push(asset);
+      currentLayout.push(layout);
+      renderThumbs();
+      return current.length - 1;
+    }
+
+    function clampDraggedLayout(layout) {
+      const b = layout.bounds;
+      if (!b) return;
+      const halfW = b.w * 0.5;
+      layout.x = Math.max(halfW + 8, Math.min(W - halfW - 8, layout.x));
+      layout.bottom = Math.max(b.h + 8, Math.min(H - 8, layout.bottom));
+    }
+
+    canvas.addEventListener("pointerdown", event => {
+      if (!current.length) return;
+      const point = canvasPoint(event);
+      const hit = hitPerson(point);
+      if (!hit) return;
+      const index = movePersonToFront(hit.index);
+      const layout = currentLayout[index];
+      dragState = {
+        pointerId: event.pointerId,
+        index,
+        offsetX: point.x - layout.x,
+        offsetY: point.y - layout.bottom
+      };
+      canvas.classList.add("dragging");
+      canvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      draw();
+    });
+
+    canvas.addEventListener("pointermove", event => {
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      const layout = currentLayout[dragState.index];
+      if (!layout) return;
+      const point = canvasPoint(event);
+      layout.x = point.x - dragState.offsetX;
+      layout.bottom = point.y - dragState.offsetY;
+      clampDraggedLayout(layout);
+      event.preventDefault();
+      draw();
+    });
+
+    function endDrag(event) {
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      canvas.classList.remove("dragging");
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+      dragState = null;
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
 
     function draw() {
       drawBackground();
