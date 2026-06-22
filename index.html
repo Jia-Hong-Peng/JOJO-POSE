@@ -741,6 +741,7 @@
         src: item.src,
         img: item.img,
         trim,
+        comRatio: typeof trim.comRatio === "number" ? trim.comRatio : 0.5,
         trimCtx: trim.getContext("2d", { willReadFrequently: true })
       };
     }
@@ -756,6 +757,8 @@
       let minY = temp.height;
       let maxX = -1;
       let maxY = -1;
+      let sumA = 0;
+      let sumAY = 0;
 
       try {
         const data = tctx.getImageData(0, 0, temp.width, temp.height).data;
@@ -767,6 +770,8 @@
               if (y < minY) minY = y;
               if (x > maxX) maxX = x;
               if (y > maxY) maxY = y;
+              sumA += alpha;
+              sumAY += alpha * y;
             }
           }
         }
@@ -784,6 +789,13 @@
         maxY = temp.height - 1;
       }
 
+      // alpha 加權垂直重心，轉為內容框內的比例（0=頂、1=底）
+      let comRatio = 0.5;
+      if (sumA > 0 && maxY > minY) {
+        comRatio = (sumAY / sumA - minY) / (maxY - minY);
+        comRatio = Math.max(0, Math.min(1, comRatio));
+      }
+
       const padding = 8;
       minX = Math.max(0, minX - padding);
       minY = Math.max(0, minY - padding);
@@ -796,6 +808,7 @@
       out.width = w;
       out.height = h;
       out.getContext("2d").drawImage(temp, minX, minY, w, h, 0, 0, w, h);
+      out.comRatio = comRatio;
       return out;
     }
 
@@ -1388,6 +1401,32 @@
 
       const sumAll = meta.reduce((s, o) => s + o.effW, 0);
 
+      // 朝向自動收斂：中心線左側朝右、右側朝左，兩側往中間看
+      const applyFacing = () => {
+        currentLayout.forEach(lay => {
+          lay.flip = lay.x < W / 2 ? 1 : -1;
+        });
+      };
+
+      // 動態姿勢基準線校正：重心明顯偏上的跳躍姿略微下沉，避免浮在半空
+      const applyBaselineCorrection = () => {
+        const ratios = current.map(a => (typeof a.comRatio === "number" ? a.comRatio : 0.5));
+        if (!ratios.length) return;
+        const sorted = [...ratios].sort((p, q) => p - q);
+        const mid = Math.floor(sorted.length / 2);
+        const stdRatio = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        current.forEach((asset, i) => {
+          const lay = currentLayout[i];
+          if (!lay) return;
+          const effH = lay.targetHeight * (lay.userScale || 1);
+          const dev = stdRatio - (typeof asset.comRatio === "number" ? asset.comRatio : 0.5);
+          if (dev > 0.03) {
+            const sink = Math.min(dev * effH, effH * 0.12);
+            lay.bottom = Math.min(H - 4, lay.bottom + sink);
+          }
+        });
+      };
+
       // 能塞進單列就單列：基準線對齊、平均間距、完全零遮擋
       if (sumAll + gapMin * (n - 1) <= usableW) {
         let gap = n > 1 ? (usableW - sumAll) / (n - 1) : 0;
@@ -1401,6 +1440,8 @@
           o.lay.row = 1;
           cursor += o.effW + gap;
         });
+        applyBaselineCorrection();
+        applyFacing();
         selectedAsset = null;
         draw();
         renderThumbs();
@@ -1442,6 +1483,33 @@
         for (let r = 0; r < rows; r += 1) baseline[r] = Math.min(H * 0.95, baseline[r] + shift);
       }
 
+      // 錯位基準：以最前排的平均中心間距為一步，後排錯開半步落在縫隙
+      const frontRow = bins[rows - 1];
+      let frontStep = 0;
+      if (frontRow.length > 1) {
+        const fSumW = frontRow.reduce((s, o) => s + o.effW, 0);
+        const fGap = Math.max(gapMin, Math.min((usableW - fSumW) / (frontRow.length - 1), gapMax));
+        frontStep = fSumW / frontRow.length + fGap;
+      }
+      const halfStep = frontStep / 2;
+
+      // 金字塔身高分配：每列內最高者置中、往兩側遞減，畫面重心更穩
+      const pyramidOrder = arr => {
+        const s = [...arr].sort((a, b) => b.effH - a.effH);
+        const n = s.length;
+        const center = (n - 1) / 2;
+        const slots = [...Array(n).keys()].sort((p, q) => {
+          const dp = Math.abs(p - center);
+          const dq = Math.abs(q - center);
+          if (dp !== dq) return dp - dq;
+          return q - p; // 同距離時先給右側
+        });
+        const res = new Array(n);
+        slots.forEach((slot, rank) => { res[slot] = s[rank]; });
+        return res;
+      };
+      for (let r = 0; r < rows; r += 1) bins[r] = pyramidOrder(bins[r]);
+
       // 排列各列，並依「後排在前」重建陣列順序（後排先畫、前排蓋在上）
       const newAssets = [];
       const newLayouts = [];
@@ -1450,7 +1518,15 @@
         let gap = b.length > 1 ? (usableW - sumW) / (b.length - 1) : 0;
         gap = Math.max(gapMin, Math.min(gap, gapMax));
         const totalW = sumW + gap * (b.length - 1);
-        let cursor = marginX + (usableW - totalW) / 2;
+
+        // 後排相對最前排錯半步（依層深交錯），落在前排兩人之間的縫隙
+        const depth = (rows - 1) - r;
+        const offset = (depth % 2 === 1) ? halfStep : 0;
+        let start = marginX + (usableW - totalW) / 2 + offset;
+        // 夾住整列邊界，保持列內間距不變
+        start = Math.max(marginX, Math.min(start, marginX + usableW - totalW));
+
+        let cursor = start;
         b.forEach(o => {
           o.lay.x = cursor + o.effW / 2;
           o.lay.bottom = baseline[r];
@@ -1466,6 +1542,8 @@
       currentLayout.length = 0;
       currentLayout.push(...newLayouts);
 
+      applyBaselineCorrection();
+      applyFacing();
       selectedAsset = null;
       draw();
       renderThumbs();
