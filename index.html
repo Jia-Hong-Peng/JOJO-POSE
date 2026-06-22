@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>團體照隨機產生器</title>
+  <title>2026 H1 Team Building 團體照</title>
   <style>
     :root {
       color-scheme: light;
@@ -42,7 +42,8 @@
     }
 
     .app {
-      min-height: 100%;
+      height: 100%;
+      overflow: hidden;
       display: grid;
       grid-template-rows: auto 1fr;
     }
@@ -150,7 +151,9 @@
       min-height: 0;
       padding: 18px;
       display: grid;
-      place-items: center;
+      place-items: start center;
+      align-content: start;
+      overflow: auto;
     }
 
     .canvas-shell {
@@ -259,6 +262,78 @@
       padding: 6px;
     }
 
+    .thumb.clickable {
+      cursor: pointer;
+    }
+
+    .thumb.clickable:hover {
+      border-color: #a9b4c5;
+    }
+
+    .thumb.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(13, 127, 115, 0.35);
+    }
+
+    .thumb.selected {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45);
+    }
+
+    .thumb .pick {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      line-height: 22px;
+      text-align: center;
+      display: none;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+
+    .thumb .pick:hover {
+      background: #c0392b;
+    }
+
+    .thumb.active .pick {
+      display: block;
+    }
+
+    .thumb .add {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #0d7f73;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 21px;
+      text-align: center;
+      display: block;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    .thumb .add:hover {
+      background: #0b9a8a;
+    }
+
+    .thumb {
+      position: relative;
+    }
+
     .thumb span {
       min-width: 0;
       padding: 0 8px 7px;
@@ -342,13 +417,85 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 20, 30, 0.62);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+      max-width: min(92vw, 1000px);
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      border-color: #a9b4c5;
+      background: #fbfcfe;
+    }
+
+    .modal-body {
+      padding: 16px;
+      overflow: auto;
+      background: var(--panel);
+    }
+
+    .modal-body img {
+      display: block;
+      max-width: 100%;
+      max-height: calc(92vh - 110px);
+      margin: 0 auto;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
   <main class="app">
     <header class="topbar">
       <div class="title">
-        <h1>團體照</h1>
+        <h1>2026 H1 Team Building 團體照</h1>
         <div class="status" id="status">載入 PNG 中</div>
       </div>
       <div class="actions">
@@ -361,6 +508,30 @@
         <button class="button primary" id="randomButton" type="button" title="重新隨機">
           <span class="icon" aria-hidden="true">↻</span>
           重新隨機
+        </button>
+        <button class="button" id="editButton" type="button" title="編輯模式" aria-pressed="false">
+          <span class="icon" aria-hidden="true">✎</span>
+          編輯模式
+        </button>
+        <button class="button" id="arrangeButton" type="button" title="保留各自大小，自動均分間距整齊排列">
+          <span class="icon" aria-hidden="true">▦</span>
+          自動排列
+        </button>
+        <button class="button" id="duplicateButton" type="button" title="複製選取人物（同一動作再加一個）">
+          <span class="icon" aria-hidden="true">⧉</span>
+          複製選取
+        </button>
+        <button class="button" id="flipButton" type="button" title="將選取人物左右鏡像">
+          <span class="icon" aria-hidden="true">⇄</span>
+          左右鏡像
+        </button>
+        <button class="button" id="clearButton" type="button" title="清空畫布上的所有人物">
+          <span class="icon" aria-hidden="true">🗑</span>
+          一鍵清空
+        </button>
+        <button class="button" id="referenceButton" type="button" title="查看參考範例">
+          <span class="icon" aria-hidden="true">🖼</span>
+          參考範例
         </button>
         <button class="button" id="downloadButton" type="button" title="下載 PNG">
           <span class="icon" aria-hidden="true">⇩</span>
@@ -386,8 +557,8 @@
           <div class="field">
             <label for="countRange">人數</label>
             <div class="range-row">
-              <input id="countRange" type="range" min="2" max="10" value="6" step="1">
-              <div class="value" id="countValue">6</div>
+              <input id="countRange" type="range" min="2" max="10" value="9" step="1">
+              <div class="value" id="countValue">9</div>
             </div>
           </div>
           <div class="field">
@@ -410,6 +581,18 @@
       </aside>
     </section>
   </main>
+
+  <div class="modal" id="referenceModal" role="dialog" aria-modal="true" aria-label="參考範例">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>參考範例</h2>
+        <button class="modal-close" id="referenceClose" type="button" aria-label="關閉">×</button>
+      </div>
+      <div class="modal-body">
+        <img src="DEMO/demo.png" alt="團體照參考範例">
+      </div>
+    </div>
+  </div>
 
   <script>
     const defaultFiles = [
@@ -468,6 +651,14 @@
     const noticeEl = document.getElementById("notice");
     const thumbsEl = document.getElementById("thumbs");
     const randomButton = document.getElementById("randomButton");
+    const editButton = document.getElementById("editButton");
+    const arrangeButton = document.getElementById("arrangeButton");
+    const duplicateButton = document.getElementById("duplicateButton");
+    const flipButton = document.getElementById("flipButton");
+    const clearButton = document.getElementById("clearButton");
+    const referenceButton = document.getElementById("referenceButton");
+    const referenceModal = document.getElementById("referenceModal");
+    const referenceClose = document.getElementById("referenceClose");
     const downloadButton = document.getElementById("downloadButton");
     const fileInput = document.getElementById("fileInput");
     const backgroundSelect = document.getElementById("backgroundSelect");
@@ -485,6 +676,9 @@
     let currentLayout = [];
     let dragState = null;
     let randomSeed = Date.now();
+    let editMode = false;
+    let selectedAsset = null;
+    const HANDLE = 22;
 
     function personCount() {
       return Number(countRange.value);
@@ -495,7 +689,7 @@
     }
 
     function setStatus() {
-      statusEl.textContent = `${assets.length} 張素材，抽 ${personCount()} 人`;
+      statusEl.textContent = `${assets.length} 張素材，照片中 ${current.length} 人`;
     }
 
     function seededRandom() {
@@ -618,6 +812,7 @@
 
       current = shuffle(assets).slice(0, count);
       currentLayout = createLayout();
+      selectedAsset = null;
       setStatus();
       setNotice("");
       renderThumbs();
@@ -806,7 +1001,8 @@
 
     function drawPerson(asset, layout) {
       const img = asset.trim;
-      const scale = layout.targetHeight / img.height;
+      const effHeight = layout.targetHeight * (layout.userScale || 1);
+      const scale = effHeight / img.height;
       const dw = img.width * scale;
       const dh = img.height * scale;
       const x = Math.max(18 + dw * 0.5, Math.min(W - 18 - dw * 0.5, layout.x));
@@ -878,6 +1074,10 @@
       return current.length - 1;
     }
 
+    function getSelectedIndex() {
+      return selectedAsset ? current.indexOf(selectedAsset) : -1;
+    }
+
     function clampDraggedLayout(layout) {
       const b = layout.bounds;
       if (!b) return;
@@ -886,15 +1086,71 @@
       layout.bottom = Math.max(b.h + 8, Math.min(H - 8, layout.bottom));
     }
 
+    // 取得選取人物四個角控制點的畫布座標
+    function selectionHandles(bounds) {
+      if (!bounds) return [];
+      return [
+        { key: "tl", x: bounds.x, y: bounds.y },
+        { key: "tr", x: bounds.x + bounds.w, y: bounds.y },
+        { key: "bl", x: bounds.x, y: bounds.y + bounds.h },
+        { key: "br", x: bounds.x + bounds.w, y: bounds.y + bounds.h }
+      ];
+    }
+
+    function hitHandle(point, bounds) {
+      const r = HANDLE;
+      for (const h of selectionHandles(bounds)) {
+        if (Math.abs(point.x - h.x) <= r && Math.abs(point.y - h.y) <= r) {
+          return h.key;
+        }
+      }
+      return null;
+    }
+
     canvas.addEventListener("pointerdown", event => {
       if (!current.length) return;
       const point = canvasPoint(event);
+
+      // 1) 若已有選取人物，先判斷是否點到縮放控制點
+      const selIndex = getSelectedIndex();
+      if (selIndex >= 0) {
+        const layout = currentLayout[selIndex];
+        const handle = layout && layout.bounds ? hitHandle(point, layout.bounds) : null;
+        if (handle) {
+          dragState = {
+            pointerId: event.pointerId,
+            mode: "resize",
+            index: selIndex,
+            centerX: layout.bounds.cx,
+            centerY: layout.bounds.cy,
+            startDist: Math.max(20, Math.hypot(point.x - layout.bounds.cx, point.y - layout.bounds.cy)),
+            startScale: layout.userScale || 1
+          };
+          canvas.classList.add("dragging");
+          canvas.setPointerCapture(event.pointerId);
+          event.preventDefault();
+          return;
+        }
+      }
+
+      // 2) 點到人物 → 選取並準備拖曳移動
       const hit = hitPerson(point);
-      if (!hit) return;
+      if (!hit) {
+        // 3) 點空白 → 取消選取
+        if (selectedAsset) {
+          selectedAsset = null;
+          draw();
+          renderThumbs();
+        }
+        return;
+      }
+
       const index = movePersonToFront(hit.index);
       const layout = currentLayout[index];
+      selectedAsset = current[index];
       dragState = {
         pointerId: event.pointerId,
+        mode: "move",
         index,
         offsetX: point.x - layout.x,
         offsetY: point.y - layout.bottom
@@ -903,19 +1159,56 @@
       canvas.setPointerCapture(event.pointerId);
       event.preventDefault();
       draw();
+      focusThumb(selectedAsset);
     });
 
+    function focusThumb(asset) {
+      if (!asset) return;
+      renderThumbs();
+      const el = thumbsEl.querySelector(`.thumb[data-name="${CSS.escape(asset.name)}"]`);
+      if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+
     canvas.addEventListener("pointermove", event => {
-      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        // 滑鼠移動時更新游標提示
+        updateCursor(event);
+        return;
+      }
       const layout = currentLayout[dragState.index];
       if (!layout) return;
       const point = canvasPoint(event);
-      layout.x = point.x - dragState.offsetX;
-      layout.bottom = point.y - dragState.offsetY;
-      clampDraggedLayout(layout);
+
+      if (dragState.mode === "resize") {
+        const dist = Math.max(20, Math.hypot(point.x - dragState.centerX, point.y - dragState.centerY));
+        const ratio = dist / dragState.startDist;
+        const newScale = Math.max(0.3, Math.min(3.2, dragState.startScale * ratio));
+        layout.userScale = newScale;
+        // 以原中心為支點縮放
+        const effHeight = layout.targetHeight * newScale;
+        layout.x = dragState.centerX;
+        layout.bottom = dragState.centerY + effHeight * 0.5;
+      } else {
+        layout.x = point.x - dragState.offsetX;
+        layout.bottom = point.y - dragState.offsetY;
+        clampDraggedLayout(layout);
+      }
       event.preventDefault();
       draw();
     });
+
+    function updateCursor(event) {
+      const point = canvasPoint(event);
+      const selIndex = getSelectedIndex();
+      if (selIndex >= 0) {
+        const layout = currentLayout[selIndex];
+        if (layout && layout.bounds && hitHandle(point, layout.bounds)) {
+          canvas.style.cursor = "nwse-resize";
+          return;
+        }
+      }
+      canvas.style.cursor = hitPerson(point) ? "move" : "default";
+    }
 
     function endDrag(event) {
       if (!dragState || dragState.pointerId !== event.pointerId) return;
@@ -929,46 +1222,313 @@
     canvas.addEventListener("pointerup", endDrag);
     canvas.addEventListener("pointercancel", endDrag);
 
+    function renderThumbs() {
+      thumbsEl.textContent = "";
+      if (!assets.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "尚未載入素材";
+        thumbsEl.append(empty);
+        return;
+      }
+
+      const activeNames = new Set(current.map(asset => asset.name));
+
+      assets.forEach(asset => {
+        const isActive = activeNames.has(asset.name);
+        const item = document.createElement("div");
+        item.className = "thumb";
+        item.dataset.name = asset.name;
+        if (isActive) item.classList.add("active");
+        if (selectedAsset && selectedAsset.name === asset.name) item.classList.add("selected");
+        if (editMode) item.classList.add("clickable");
+        const img = document.createElement("img");
+        img.src = asset.src;
+        img.alt = asset.name;
+        const label = document.createElement("span");
+        label.textContent = asset.name;
+
+        if (isActive) {
+          const pick = document.createElement("button");
+          pick.type = "button";
+          pick.className = "pick";
+          pick.textContent = "✓";
+          pick.title = "移除此人";
+          pick.addEventListener("mouseenter", () => { pick.textContent = "✕"; });
+          pick.addEventListener("mouseleave", () => { pick.textContent = "✓"; });
+          pick.addEventListener("click", event => {
+            event.stopPropagation();
+            toggleAsset(asset);
+          });
+          item.append(img, label, pick);
+        } else {
+          const add = document.createElement("button");
+          add.type = "button";
+          add.className = "add";
+          add.textContent = "＋";
+          add.title = "加入畫布";
+          add.addEventListener("click", event => {
+            event.stopPropagation();
+            toggleAsset(asset);
+          });
+          item.append(img, label, add);
+        }
+
+        if (editMode) {
+          item.addEventListener("click", () => toggleAsset(asset));
+        }
+        thumbsEl.append(item);
+      });
+    }
+
     function draw() {
       drawBackground();
 
-      const count = personCount();
-      if (current.length < count) {
+      if (!current.length) {
         ctx.fillStyle = "#4b5667";
-        ctx.font = "700 34px Segoe UI, sans-serif";
+        ctx.font = "700 32px Segoe UI, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("素材不足", W / 2, H / 2 - 10);
-        ctx.font = "22px Segoe UI, sans-serif";
-        ctx.fillText(`需要 ${count} 張 PNG`, W / 2, H / 2 + 32);
+        ctx.fillText("點右側頭像加入人物", W / 2, H / 2 - 6);
+        ctx.font = "20px Segoe UI, sans-serif";
+        ctx.fillText("或按「重新隨機」自動產生團體照", W / 2, H / 2 + 30);
         return;
       }
 
       current.forEach((asset, index) => {
         drawPerson(asset, currentLayout[index]);
       });
+
+      drawSelection();
     }
 
-    function renderThumbs() {
-      thumbsEl.textContent = "";
-      if (!current.length) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "尚未選取素材";
-        thumbsEl.append(empty);
+    function drawSelection() {
+      const idx = getSelectedIndex();
+      if (idx < 0) return;
+      const b = currentLayout[idx] && currentLayout[idx].bounds;
+      if (!b) return;
+
+      ctx.save();
+      ctx.strokeStyle = "#0d7f73";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 6]);
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.setLineDash([]);
+
+      selectionHandles(b).forEach(h => {
+        ctx.beginPath();
+        ctx.rect(h.x - HANDLE / 2, h.y - HANDLE / 2, HANDLE, HANDLE);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#0d7f73";
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    function setEditMode(on) {
+      editMode = on;
+      editButton.classList.toggle("primary", on);
+      editButton.setAttribute("aria-pressed", on ? "true" : "false");
+      setNotice(on ? "編輯模式：點擊右側頭像加入或移除" : "");
+      renderThumbs();
+    }
+
+    function toggleAsset(asset) {
+      const index = current.findIndex(item => item.name === asset.name);
+      if (index >= 0) {
+        current.splice(index, 1);
+        currentLayout.splice(index, 1);
+        if (selectedAsset === asset) selectedAsset = null;
+      } else {
+        current.push(asset);
+        currentLayout.push(makeSingleLayout(asset));
+        selectedAsset = asset;
+      }
+      setStatus();
+      renderThumbs();
+      draw();
+    }
+
+    function makeSingleLayout(asset) {
+      const placed = current.length - 1;
+      const offset = (placed % 6) * (W * 0.05);
+      return {
+        x: W * 0.32 + offset,
+        bottom: H * 0.92,
+        targetHeight: H * 0.6,
+        rotate: 0,
+        flip: 1,
+        row: 1,
+        userScale: 1
+      };
+    }
+
+    function autoArrange() {
+      const n = current.length;
+      if (!n) {
+        setNotice("畫布是空的，先加入人物再排列。");
         return;
       }
 
-      current.forEach(asset => {
-        const item = document.createElement("div");
-        item.className = "thumb";
-        const img = document.createElement("img");
-        img.src = asset.src;
-        img.alt = asset.name;
-        const label = document.createElement("span");
-        label.textContent = asset.name;
-        item.append(img, label);
-        thumbsEl.append(item);
+      const usableW = W * 0.92;
+      const marginX = (W - usableW) / 2;
+      const gapMin = W * 0.02;        // 保證的最小間距（不重疊）
+      const gapMax = W * 0.08;
+      const frontBottom = H * 0.92;   // 最前排站位
+      const topMargin = H * 0.06;     // 最後排頭頂上邊界
+
+      // 保留每個人各自的大小
+      const meta = current.map((asset, i) => {
+        const lay = currentLayout[i];
+        const effH = lay.targetHeight * (lay.userScale || 1);
+        const aspect = asset.trim.width / asset.trim.height;
+        return { asset, lay, effH, effW: effH * aspect };
       });
+
+      const sumAll = meta.reduce((s, o) => s + o.effW, 0);
+
+      // 能塞進單列就單列：基準線對齊、平均間距、完全零遮擋
+      if (sumAll + gapMin * (n - 1) <= usableW) {
+        let gap = n > 1 ? (usableW - sumAll) / (n - 1) : 0;
+        gap = Math.min(gap, gapMax);
+        const totalW = sumAll + gap * (n - 1);
+        let cursor = marginX + (usableW - totalW) / 2;
+        meta.forEach(o => {
+          o.lay.x = cursor + o.effW / 2;
+          o.lay.bottom = H * 0.9;
+          o.lay.rotate = 0;
+          o.lay.row = 1;
+          cursor += o.effW + gap;
+        });
+        selectedAsset = null;
+        draw();
+        renderThumbs();
+        setNotice("已自動排列為 1 列，保留各自大小、無遮擋。");
+        return;
+      }
+
+      // 多列：高的排後面（先畫，在底層）、矮的排前面（後畫，在上層）
+      // → 前排永遠在上不擋人，後排因較高，頭一定露出
+      const sorted = [...meta].sort((a, b) => b.effH - a.effH);
+      const bins = [];
+      let row = [];
+      let rowW = 0;
+      sorted.forEach(o => {
+        const add = (row.length ? gapMin : 0) + o.effW;
+        if (row.length && rowW + add > usableW) {
+          bins.push(row);
+          row = [];
+          rowW = 0;
+        }
+        row.push(o);
+        rowW += (row.length > 1 ? gapMin : 0) + o.effW;
+      });
+      if (row.length) bins.push(row);
+      const rows = bins.length;
+
+      // 各列基準線：從最前排往後逐列抬升（抬升量 = 前一排最高者的一半）
+      const rowMaxH = bins.map(b => Math.max(...b.map(o => o.effH)));
+      const baseline = new Array(rows);
+      baseline[rows - 1] = frontBottom;
+      for (let r = rows - 2; r >= 0; r -= 1) {
+        baseline[r] = baseline[r + 1] - rowMaxH[r + 1] * 0.5;
+      }
+      // 若最上排頭頂超出畫布，整體下移
+      let minTop = Infinity;
+      for (let r = 0; r < rows; r += 1) minTop = Math.min(minTop, baseline[r] - rowMaxH[r]);
+      if (minTop < topMargin) {
+        const shift = topMargin - minTop;
+        for (let r = 0; r < rows; r += 1) baseline[r] = Math.min(H * 0.95, baseline[r] + shift);
+      }
+
+      // 排列各列，並依「後排在前」重建陣列順序（後排先畫、前排蓋在上）
+      const newAssets = [];
+      const newLayouts = [];
+      bins.forEach((b, r) => {
+        const sumW = b.reduce((s, o) => s + o.effW, 0);
+        let gap = b.length > 1 ? (usableW - sumW) / (b.length - 1) : 0;
+        gap = Math.max(gapMin, Math.min(gap, gapMax));
+        const totalW = sumW + gap * (b.length - 1);
+        let cursor = marginX + (usableW - totalW) / 2;
+        b.forEach(o => {
+          o.lay.x = cursor + o.effW / 2;
+          o.lay.bottom = baseline[r];
+          o.lay.rotate = 0;
+          o.lay.row = r === rows - 1 ? 1 : 0;
+          cursor += o.effW + gap;
+          newAssets.push(o.asset);
+          newLayouts.push(o.lay);
+        });
+      });
+      current.length = 0;
+      current.push(...newAssets);
+      currentLayout.length = 0;
+      currentLayout.push(...newLayouts);
+
+      selectedAsset = null;
+      draw();
+      renderThumbs();
+      setNotice(`已自動排列為 ${rows} 列（高者在後、矮者在前），保留各自大小。`);
+    }
+
+    function clearAll() {
+      if (!current.length) {
+        setNotice("畫布已是空的。");
+        return;
+      }
+      current.length = 0;
+      currentLayout.length = 0;
+      selectedAsset = null;
+      setStatus();
+      draw();
+      renderThumbs();
+      setNotice("已清空畫布，點右側頭像或按重新隨機重新加入。");
+    }
+
+    function deleteSelected() {
+      const idx = getSelectedIndex();
+      if (idx < 0) return;
+      current.splice(idx, 1);
+      currentLayout.splice(idx, 1);
+      selectedAsset = null;
+      setStatus();
+      draw();
+      renderThumbs();
+    }
+
+    function duplicateSelected() {
+      const idx = getSelectedIndex();
+      if (idx < 0) {
+        setNotice("請先在畫面上點選一個人物，再按複製。");
+        return;
+      }
+      const src = currentLayout[idx];
+      const clone = { ...current[idx] };          // 共用同一張圖，視為獨立人物
+      const copy = {
+        ...src,
+        x: Math.min(W * 0.95, (src.x || W * 0.5) + W * 0.06),
+        bottom: src.bottom,
+        bounds: undefined
+      };
+      current.push(clone);
+      currentLayout.push(copy);
+      selectedAsset = clone;
+      setStatus();
+      draw();
+      renderThumbs();
+      focusThumb(clone);
+    }
+
+    function flipSelected() {
+      const idx = getSelectedIndex();
+      if (idx < 0) {
+        setNotice("請先在畫面上點選一個人物，再按鏡像。");
+        return;
+      }
+      const lay = currentLayout[idx];
+      lay.flip = (lay.flip || 1) * -1;
+      draw();
     }
 
     async function addFiles(files) {
@@ -986,9 +1546,21 @@
         }
       }
 
+      if (!loaded.length) return;
+
       assets = assets.concat(loaded);
+
+      // 新加入的圖片直接放進目前照片，保留其他人已排好的位置
+      for (const asset of loaded) {
+        current.push(asset);
+        currentLayout.push(makeSingleLayout(asset));
+      }
+      selectedAsset = loaded[loaded.length - 1];
+
+      renderThumbs();
       setStatus();
-      randomize();
+      draw();
+      setNotice(`已加入 ${loaded.length} 張圖片，可直接拖曳調整位置與大小。`);
     }
 
     function downloadPng() {
@@ -1013,6 +1585,30 @@
     }
 
     randomButton.addEventListener("click", randomize);
+    editButton.addEventListener("click", () => setEditMode(!editMode));
+    arrangeButton.addEventListener("click", autoArrange);
+    duplicateButton.addEventListener("click", duplicateSelected);
+    flipButton.addEventListener("click", flipSelected);
+    clearButton.addEventListener("click", clearAll);
+    function openReference() { referenceModal.classList.add("open"); }
+    function closeReference() { referenceModal.classList.remove("open"); }
+    referenceButton.addEventListener("click", openReference);
+    referenceClose.addEventListener("click", closeReference);
+    referenceModal.addEventListener("click", event => {
+      if (event.target === referenceModal) closeReference();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && referenceModal.classList.contains("open")) {
+        closeReference();
+        return;
+      }
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      const tag = (event.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || event.target.isContentEditable) return;
+      if (getSelectedIndex() < 0) return;
+      event.preventDefault();
+      deleteSelected();
+    });
     downloadButton.addEventListener("click", downloadPng);
     fileInput.addEventListener("change", event => addFiles(event.target.files));
     backgroundSelect.addEventListener("change", draw);
